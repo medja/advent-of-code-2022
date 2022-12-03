@@ -9,6 +9,7 @@ use num_enum::{IntoPrimitive, TryFromPrimitive};
 use regex::Regex;
 
 mod day_01;
+mod day_02;
 
 lazy_static! {
     static ref CHALLENGE_PATTERN: Regex =
@@ -22,6 +23,8 @@ lazy_static! {
 
         solutions.add(Day01, PartA, day_01::part_a);
         solutions.add(Day01, PartB, day_01::part_b);
+        solutions.add(Day02, PartA, day_02::part_a);
+        solutions.add(Day02, PartB, day_02::part_b);
 
         solutions
     };
@@ -31,6 +34,7 @@ lazy_static! {
 #[repr(u8)]
 pub enum Day {
     Day01 = 1,
+    Day02 = 2,
 }
 
 impl Day {
@@ -39,6 +43,7 @@ impl Day {
 
         match self {
             Day01 => "Calorie Counting",
+            Day02 => "Rock Paper Scissors",
         }
     }
 
