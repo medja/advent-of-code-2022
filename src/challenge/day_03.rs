@@ -1,10 +1,28 @@
 pub fn part_a(input: &[&str]) -> anyhow::Result<impl std::fmt::Display> {
-    Ok(input.iter().map(|line| Rucksack::new(line.as_bytes()).score()).sum::<usize>())
+    let result = input.iter()
+        .map(|line| {
+            let items = line.as_bytes();
+            let length = items.len() / 2;
+            [Rucksack::new(&items[..length]), Rucksack::new(&items[length..])].score()
+        })
+        .sum::<usize>();
+
+    Ok(result)
 }
 
-struct Compartment(u64);
+pub fn part_b(input: &[&str]) -> anyhow::Result<impl std::fmt::Display> {
+    let result = input.chunks_exact(3)
+        .map(|chunk| {
+            std::array::from_fn::<_, 3, _>(|index| Rucksack::new(chunk[index].as_bytes())).score()
+        })
+        .sum::<usize>();
 
-impl Compartment {
+    Ok(result)
+}
+
+struct Rucksack(u64);
+
+impl Rucksack {
     fn new(items: &[u8]) -> Self {
         let mut flags = 0;
 
@@ -18,29 +36,22 @@ impl Compartment {
             flags |= 1 << index;
         }
 
-        Compartment(flags)
-    }
-
-    fn score(&self, other: &Self) -> usize {
-        (0..52)
-            .filter(|index| {
-                let mask = 1 << *index;
-                self.0 & mask == mask && other.0 & mask == mask
-            })
-            .map(|index| index + 1)
-            .sum::<usize>()
+        Rucksack(flags)
     }
 }
 
-struct Rucksack(Compartment, Compartment);
+trait Score {
+    fn score(&self) -> usize;
+}
 
-impl Rucksack {
-    fn new(items: &[u8]) -> Self {
-        let length = items.len() / 2;
-        Rucksack(Compartment::new(&items[..length]), Compartment::new(&items[length..]))
-    }
-
+impl<const N: usize> Score for [Rucksack; N] {
     fn score(&self) -> usize {
-        self.0.score(&self.1)
+        (0..52)
+            .filter(|index| {
+                let mask = 1 << *index;
+                self.iter().all(|item| item.0 & mask == mask)
+            })
+            .map(|index| index + 1)
+            .sum::<usize>()
     }
 }
