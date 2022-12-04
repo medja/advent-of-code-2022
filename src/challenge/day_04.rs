@@ -2,29 +2,25 @@ use std::str::FromStr;
 use anyhow::Context;
 
 pub fn part_a(input: &[&str]) -> anyhow::Result<impl std::fmt::Display> {
-    Ok(solve(input, Pair::contains_overlap))
+    Ok(solve(input, Range::overlaps))
 }
 
 pub fn part_b(input: &[&str]) -> anyhow::Result<impl std::fmt::Display> {
-    Ok(solve(input, Pair::contains_partial_overlap))
+    Ok(solve(input, Range::partially_overlaps))
 }
 
-fn solve(input: &[&str], filter: fn(&Pair) -> bool) -> usize {
+fn solve(input: &[&str], cond: fn(&Range, &Range) -> bool) -> usize {
     input.iter()
         .filter_map(|line| Pair::from_str(line).ok())
-        .filter(filter)
+        .filter(|pair| pair.check_condition(cond))
         .count()
 }
 
 struct Pair(Range, Range);
 
 impl Pair {
-    fn contains_overlap(&self) -> bool {
-        self.0.overlaps(&self.1) || self.1.overlaps(&self.0)
-    }
-
-    fn contains_partial_overlap(&self) -> bool {
-        self.0.partially_overlaps(&self.1) || self.1.partially_overlaps(&self.0)
+    fn check_condition(&self, cond: fn(&Range, &Range) -> bool) -> bool {
+        cond(&self.0, &self.1) || cond(&self.1, &self.0)
     }
 }
 
