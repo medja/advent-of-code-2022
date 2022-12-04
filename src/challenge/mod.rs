@@ -16,7 +16,6 @@ mod day_04;
 lazy_static! {
     static ref CHALLENGE_PATTERN: Regex =
         Regex::new("(?i)(?:Day\\W*)?(\\d\\d?)\\W*([AB])").unwrap();
-
     static ref SOLUTIONS: Solutions = {
         use Day::*;
         use Part::*;
@@ -36,7 +35,9 @@ lazy_static! {
     };
 }
 
-#[derive(IntoPrimitive, TryFromPrimitive, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
+#[derive(
+    IntoPrimitive, TryFromPrimitive, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug,
+)]
 #[repr(u8)]
 pub enum Day {
     Day01 = 1,
@@ -103,7 +104,10 @@ impl FromStr for Part {
         match string {
             "a" | "A" => Ok(Part::PartA),
             "b" | "B" => Ok(Part::PartB),
-            _ => Err(anyhow::anyhow!("{} is not a valid part, expecting A or B", string)),
+            _ => Err(anyhow::anyhow!(
+                "{} is not a valid part, expecting A or B",
+                string
+            )),
         }
     }
 }

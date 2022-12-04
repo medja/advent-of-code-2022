@@ -1,9 +1,14 @@
 pub fn part_a(input: &[&str]) -> anyhow::Result<impl std::fmt::Display> {
-    let result = input.iter()
+    let result = input
+        .iter()
         .map(|line| {
             let items = line.as_bytes();
             let length = items.len() / 2;
-            [Rucksack::new(&items[..length]), Rucksack::new(&items[length..])].score()
+            [
+                Rucksack::new(&items[..length]),
+                Rucksack::new(&items[length..]),
+            ]
+            .score()
         })
         .sum::<usize>();
 
@@ -11,7 +16,8 @@ pub fn part_a(input: &[&str]) -> anyhow::Result<impl std::fmt::Display> {
 }
 
 pub fn part_b(input: &[&str]) -> anyhow::Result<impl std::fmt::Display> {
-    let result = input.chunks_exact(3)
+    let result = input
+        .chunks_exact(3)
         .map(|chunk| {
             std::array::from_fn::<_, 3, _>(|index| Rucksack::new(chunk[index].as_bytes())).score()
         })

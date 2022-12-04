@@ -1,5 +1,5 @@
-use std::str::FromStr;
 use anyhow::Context;
+use std::str::FromStr;
 
 pub fn part_a(input: &[&str]) -> anyhow::Result<impl std::fmt::Display> {
     Ok(solve(input, Range::overlaps))
@@ -10,7 +10,8 @@ pub fn part_b(input: &[&str]) -> anyhow::Result<impl std::fmt::Display> {
 }
 
 fn solve(input: &[&str], cond: fn(&Range, &Range) -> bool) -> usize {
-    input.iter()
+    input
+        .iter()
         .filter_map(|line| Pair::from_str(line).ok())
         .filter(|pair| pair.check_condition(cond))
         .count()
@@ -28,7 +29,8 @@ impl FromStr for Pair {
     type Err = anyhow::Error;
 
     fn from_str(pair: &str) -> Result<Self, Self::Err> {
-        let (first, second) = pair.split_once(',')
+        let (first, second) = pair
+            .split_once(',')
             .with_context(|| format!("{} is not a valid pair", pair))?;
 
         Ok(Pair(first.parse()?, second.parse()?))
@@ -37,7 +39,7 @@ impl FromStr for Pair {
 
 struct Range {
     start: usize,
-    end: usize
+    end: usize,
 }
 
 impl Range {
@@ -54,7 +56,8 @@ impl FromStr for Range {
     type Err = anyhow::Error;
 
     fn from_str(range: &str) -> Result<Self, Self::Err> {
-        let (start, end) = range.split_once('-')
+        let (start, end) = range
+            .split_once('-')
             .with_context(|| format!("{} is not a valid range", range))?;
 
         let result = Range {

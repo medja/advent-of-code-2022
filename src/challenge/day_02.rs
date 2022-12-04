@@ -28,7 +28,9 @@ pub fn part_b(input: &[&str]) -> anyhow::Result<impl std::fmt::Display> {
     Ok(result)
 }
 
-#[derive(FromPrimitive, IntoPrimitive, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
+#[derive(
+    FromPrimitive, IntoPrimitive, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug,
+)]
 #[repr(usize)]
 enum Hand {
     #[default]
@@ -57,7 +59,9 @@ impl From<u8> for Hand {
     }
 }
 
-#[derive(FromPrimitive, IntoPrimitive, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
+#[derive(
+    FromPrimitive, IntoPrimitive, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug,
+)]
 #[repr(usize)]
 enum Outcome {
     #[default]
