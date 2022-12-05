@@ -42,12 +42,9 @@ impl FromStr for Instruction {
     type Err = anyhow::Error;
 
     fn from_str(line: &str) -> Result<Self, Self::Err> {
-        let mut iterator = line.split_ascii_whitespace();
-        iterator.next();
+        let mut iterator = line.split_ascii_whitespace().skip(1).step_by(2);
         let count = next_number(&mut iterator, line)?;
-        iterator.next();
         let from = next_number(&mut iterator, line)? - 1;
-        iterator.next();
         let to = next_number(&mut iterator, line)? - 1;
         Ok(Instruction { count, from, to })
     }
@@ -73,15 +70,12 @@ impl Stacks {
         let mut stacks = (0..columns).map(|_| Vec::new()).collect::<Box<[_]>>();
 
         for line in lines.iter().rev().skip(1) {
-            let bytes = line.as_bytes();
-
-            for i in 0..columns {
-                let byte = bytes[i * 4 + 1];
-
-                if byte != b' ' {
-                    stacks[i].push(byte);
-                }
-            }
+            line.bytes()
+                .skip(1)
+                .step_by(4)
+                .enumerate()
+                .filter(|(_, byte)| *byte != b' ')
+                .for_each(|(i, byte)| stacks[i].push(byte));
         }
 
         Stacks(stacks)
