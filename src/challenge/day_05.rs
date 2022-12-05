@@ -1,4 +1,5 @@
 use anyhow::Context;
+use std::cmp::Ordering;
 use std::str::FromStr;
 
 pub fn part_a(input: &[&str]) -> anyhow::Result<impl std::fmt::Display> {
@@ -85,6 +86,24 @@ impl Stacks {
 
         Stacks(stacks)
     }
+
+    fn borrow_stacks(
+        &mut self,
+        first: usize,
+        second: usize,
+    ) -> Option<(&mut Vec<u8>, &mut Vec<u8>)> {
+        match first.cmp(&second) {
+            Ordering::Equal => None,
+            Ordering::Less => {
+                let (left, right) = self.0.split_at_mut(second);
+                Some((&mut left[first], &mut right[0]))
+            }
+            Ordering::Greater => {
+                let (left, right) = self.0.split_at_mut(first);
+                Some((&mut right[0], &mut left[second]))
+            }
+        }
+    }
 }
 
 struct CrateMover9000;
@@ -96,22 +115,16 @@ trait Crane {
 
 impl Crane for CrateMover9000 {
     fn move_crates(&self, stacks: &mut Stacks, instruction: Instruction) {
-        for _ in 0..instruction.count {
-            let value = stacks.0[instruction.from].pop().unwrap();
-            stacks.0[instruction.to].push(value);
+        if let Some((from, to)) = stacks.borrow_stacks(instruction.from, instruction.to) {
+            to.extend(from.drain(from.len() - instruction.count..).rev());
         }
     }
 }
 
 impl Crane for CrateMover9001 {
     fn move_crates(&self, stacks: &mut Stacks, instruction: Instruction) {
-        let length = stacks.0[instruction.from].len();
-        let start = length - instruction.count;
-
-        for i in start..length {
-            stacks.0[instruction.to].push(stacks.0[instruction.from][i])
+        if let Some((from, to)) = stacks.borrow_stacks(instruction.from, instruction.to) {
+            to.extend(from.drain(from.len() - instruction.count..));
         }
-
-        stacks.0[instruction.from].truncate(start);
     }
 }
