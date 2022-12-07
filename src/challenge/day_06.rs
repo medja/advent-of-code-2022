@@ -9,14 +9,13 @@ pub fn part_b(input: &[&str]) -> anyhow::Result<impl std::fmt::Display> {
 fn solve(sequence: &[u8], length: usize) -> usize {
     let result = sequence
         .windows(length)
-        .enumerate()
-        .find(|(_, bytes)| {
+        .position(|bytes| {
             bytes
                 .iter()
-                .enumerate()
-                .all(|(i, x)| bytes[i + 1..].iter().all(|y| x != y))
+                .map(|byte| 1u32 << (byte - b'a'))
+                .fold(0u32, |acc, value| acc | value)
+                .count_ones() as usize == length
         })
-        .map(|(i, _)| i)
         .unwrap();
 
     result + length
