@@ -9,6 +9,19 @@ pub fn part_a(input: &[&str]) -> anyhow::Result<impl std::fmt::Display> {
     Ok(result)
 }
 
+pub fn part_b(input: &[&str]) -> anyhow::Result<impl std::fmt::Display> {
+    let directories = compute_directory_sizes(input)?;
+    let min_size = directories.get("").unwrap() - 40000000; // (+ 30000000 - 70000000)
+
+    let result = *directories
+        .values()
+        .filter(|size| **size >= min_size)
+        .min()
+        .unwrap();
+
+    Ok(result)
+}
+
 fn compute_directory_sizes(input: &[&str]) -> anyhow::Result<HashMap<String, usize>> {
     let mut working_directory = Vec::with_capacity(16);
     let mut directory_sizes = HashMap::<String, usize>::new();
