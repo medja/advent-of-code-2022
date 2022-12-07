@@ -14,7 +14,8 @@ fn solve(sequence: &[u8], length: usize) -> usize {
                 .iter()
                 .map(|byte| 1u32 << (byte - b'a'))
                 .fold(0u32, |acc, value| acc | value)
-                .count_ones() as usize == length
+                .count_ones() as usize
+                == length
         })
         .unwrap();
 
