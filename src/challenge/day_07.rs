@@ -10,8 +10,9 @@ pub fn part_a(input: &[&str]) -> anyhow::Result<impl std::fmt::Display> {
 }
 
 pub fn part_b(input: &[&str]) -> anyhow::Result<impl std::fmt::Display> {
+    let root: &[&str] = &[];
     let directories = compute_directory_sizes(input)?;
-    let min_size = directories.get("").unwrap() - 40000000; // (+ 30000000 - 70000000)
+    let min_size = directories.get(root).unwrap() - 40000000; // (+ 30000000 - 70000000)
 
     let result = *directories
         .values()
@@ -22,9 +23,9 @@ pub fn part_b(input: &[&str]) -> anyhow::Result<impl std::fmt::Display> {
     Ok(result)
 }
 
-fn compute_directory_sizes(input: &[&str]) -> anyhow::Result<HashMap<String, usize>> {
+fn compute_directory_sizes<'a>(input: &[&'a str]) -> anyhow::Result<HashMap<Vec<&'a str>, usize>> {
     let mut working_directory = Vec::with_capacity(16);
-    let mut directory_sizes = HashMap::<String, usize>::new();
+    let mut directory_sizes = HashMap::new();
 
     for line in input {
         if line.starts_with(|char: char| char.is_ascii_digit()) {
@@ -35,9 +36,12 @@ fn compute_directory_sizes(input: &[&str]) -> anyhow::Result<HashMap<String, usi
                 .parse::<usize>()?;
 
             for i in 0..=working_directory.len() {
-                *directory_sizes
-                    .entry(build_path(&working_directory[..i]))
-                    .or_default() += size;
+                match directory_sizes.get_mut(&working_directory[..i]) {
+                    Some(sum) => *sum += size,
+                    None => {
+                        directory_sizes.insert(working_directory[..i].to_vec(), size);
+                    }
+                }
             }
         } else if line.starts_with("$ cd") {
             change_directory(&mut working_directory, &line[5..]);
@@ -45,19 +49,6 @@ fn compute_directory_sizes(input: &[&str]) -> anyhow::Result<HashMap<String, usi
     }
 
     Ok(directory_sizes)
-}
-
-fn build_path(segments: &[&str]) -> String {
-    let length = segments.iter().map(|segment| segment.len() + 1).sum();
-
-    let mut path = String::with_capacity(length);
-
-    for segment in segments {
-        path.push('/');
-        path.push_str(segment);
-    }
-
-    path
 }
 
 fn change_directory<'a>(working_directory: &mut Vec<&'a str>, mut path: &'a str) {
