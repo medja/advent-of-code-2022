@@ -1,8 +1,15 @@
 const VISITED_MASK: u8 = 1 << 7;
 
 pub fn part_a(input: &[&str]) -> anyhow::Result<impl std::fmt::Display> {
-    let trees = Vec::from_iter(input.iter().flat_map(|line| line.bytes()).map(|x| x - b'0'));
-    Ok(TreeCounter::new(input.len(), trees).count())
+    Ok(TreeCounter::new(input).count())
+}
+
+pub fn part_b(input: &[&str]) -> anyhow::Result<impl std::fmt::Display> {
+    Ok(SpotSelector::new(input).select())
+}
+
+fn parse_grid(input: &[&str]) -> Vec<u8> {
+    Vec::from_iter(input.iter().flat_map(|line| line.bytes()).map(|x| x - b'0'))
 }
 
 struct TreeCounter {
@@ -13,12 +20,12 @@ struct TreeCounter {
 }
 
 impl TreeCounter {
-    fn new(size: usize, trees: Vec<u8>) -> Self {
+    fn new(input: &[&str]) -> Self {
         TreeCounter {
-            count: 4 * (size - 1),
+            count: 4 * (input.len() - 1),
             max_height: 0,
-            size,
-            trees,
+            size: input.len(),
+            trees: parse_grid(input),
         }
     }
 
@@ -65,5 +72,61 @@ impl TreeCounter {
                 self.count += 1;
             }
         }
+    }
+}
+
+struct SpotSelector {
+    size: usize,
+    trees: Vec<u8>,
+}
+
+impl SpotSelector {
+    fn new(input: &[&str]) -> Self {
+        let grid = parse_grid(input);
+
+        SpotSelector {
+            size: input.len(),
+            trees: grid,
+        }
+    }
+
+    fn select(self) -> usize {
+        let mut best_score = 0usize;
+
+        for x in 1..(self.size - 1) {
+            for y in 1..(self.size - 1) {
+                let height = self.trees[x + y * self.size];
+
+                let up = (0..y)
+                    .rev()
+                    .position(|i| self.trees[x + i * self.size] >= height)
+                    .map(|i| i + 1)
+                    .unwrap_or(y);
+
+                let down = (y + 1..self.size)
+                    .position(|i| self.trees[x + i * self.size] >= height)
+                    .map(|i| i + 1)
+                    .unwrap_or(self.size - y - 1);
+
+                let left = (0..x)
+                    .rev()
+                    .position(|i| self.trees[i + y * self.size] >= height)
+                    .map(|i| i + 1)
+                    .unwrap_or(x);
+
+                let right = (x + 1..self.size)
+                    .position(|i| self.trees[i + y * self.size] >= height)
+                    .map(|i| i + 1)
+                    .unwrap_or(self.size - x - 1);
+
+                let score = up * down * left * right;
+
+                if score > best_score {
+                    best_score = score;
+                }
+            }
+        }
+
+        best_score
     }
 }
