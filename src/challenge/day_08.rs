@@ -5,7 +5,7 @@ pub fn part_a(input: &[&str]) -> anyhow::Result<impl std::fmt::Display> {
 }
 
 pub fn part_b(input: &[&str]) -> anyhow::Result<impl std::fmt::Display> {
-    Ok(SpotSelector::new(input).select())
+    Ok(SpotSelector::new(input).select(6))
 }
 
 fn parse_grid(input: &[&str]) -> Vec<u8> {
@@ -90,12 +90,16 @@ impl SpotSelector {
         }
     }
 
-    fn select(self) -> usize {
+    fn select(self, min_height: u8) -> usize {
         let mut best_score = 0usize;
 
         for x in 1..(self.size - 1) {
             for y in 1..(self.size - 1) {
                 let height = self.trees[x + y * self.size];
+
+                if height < min_height {
+                    continue;
+                }
 
                 let up = (0..y)
                     .rev()
