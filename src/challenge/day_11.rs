@@ -3,6 +3,14 @@ use std::collections::VecDeque;
 const MONKEY_LINE_LENGTH: usize = 7;
 
 pub fn part_a(input: &[&str]) -> anyhow::Result<impl std::fmt::Display> {
+    Ok(solve(input, 20, true))
+}
+
+pub fn part_b(input: &[&str]) -> anyhow::Result<impl std::fmt::Display> {
+    Ok(solve(input, 10000, false))
+}
+
+fn solve(input: &[&str], rounds: usize, relief: bool) -> usize {
     let length = (input.len() + 1) / MONKEY_LINE_LENGTH;
     let mut monkeys = Vec::with_capacity(length);
 
@@ -11,9 +19,11 @@ pub fn part_a(input: &[&str]) -> anyhow::Result<impl std::fmt::Display> {
         monkeys.push(Monkey::parse(input));
     }
 
-    for _ in 0..20 {
+    let modulo = monkeys.iter().fold(1, |acc, monkey| acc * monkey.divisor);
+
+    for _ in 0..rounds {
         for i in 0..length {
-            while let Some(throw) = monkeys[i].throw_next_item() {
+            while let Some(throw) = monkeys[i].throw_next_item(relief, modulo) {
                 monkeys[throw.monkey].catch_item(throw.item);
             }
         }
@@ -25,20 +35,20 @@ pub fn part_a(input: &[&str]) -> anyhow::Result<impl std::fmt::Display> {
         .collect::<Vec<usize>>();
 
     counts.sort();
-    Ok(counts[length - 1] * counts[length - 2])
+    counts[length - 1] * counts[length - 2]
 }
 
 #[derive(Debug)]
 struct Throw {
     monkey: usize,
-    item: usize,
+    item: u64,
 }
 
 #[derive(Debug)]
 struct Monkey {
-    items: VecDeque<usize>,
+    items: VecDeque<u64>,
     operation: Operation,
-    divisor: usize,
+    divisor: u64,
     if_true: usize,
     if_false: usize,
     throw_count: usize,
@@ -48,22 +58,22 @@ impl Monkey {
     fn parse(input: &[&str]) -> Self {
         let items = input[1][17..]
             .split(',')
-            .map(|item| item[1..].parse::<usize>().unwrap());
+            .map(|item| item[1..].parse::<u64>().unwrap());
 
         Monkey {
             items: VecDeque::from_iter(items),
             operation: Operation::parse(&input[2][23..]),
-            divisor: input[3][21..].parse::<usize>().unwrap(),
+            divisor: input[3][21..].parse::<u64>().unwrap(),
             if_true: input[4][29..].parse::<usize>().unwrap(),
             if_false: input[5][30..].parse::<usize>().unwrap(),
             throw_count: 0,
         }
     }
 
-    fn throw_next_item(&mut self) -> Option<Throw> {
+    fn throw_next_item(&mut self, relief: bool, modulo: u64) -> Option<Throw> {
         let item = self
             .operation
-            .calculate_worry_level(self.items.pop_front()?);
+            .calculate_worry_level(self.items.pop_front()?, relief, modulo);
 
         let monkey = if item % self.divisor == 0 {
             self.if_true
@@ -76,15 +86,15 @@ impl Monkey {
         Some(Throw { item, monkey })
     }
 
-    fn catch_item(&mut self, item: usize) {
+    fn catch_item(&mut self, item: u64) {
         self.items.push_back(item);
     }
 }
 
 #[derive(Debug)]
 enum Operation {
-    Add(usize),
-    Multiply(usize),
+    Add(u64),
+    Multiply(u64),
     Square,
 }
 
@@ -94,7 +104,7 @@ impl Operation {
             return Operation::Square;
         }
 
-        let value = input[2..].parse::<usize>().unwrap();
+        let value = input[2..].parse::<u64>().unwrap();
 
         match input.as_bytes()[0] {
             b'+' => Operation::Add(value),
@@ -103,13 +113,17 @@ impl Operation {
         }
     }
 
-    fn calculate_worry_level(&self, item: usize) -> usize {
+    fn calculate_worry_level(&self, item: u64, relief: bool, modulo: u64) -> u64 {
         let result = match self {
-            Operation::Add(value) => value + item as usize,
-            Operation::Multiply(value) => value * item as usize,
-            Operation::Square => item as usize * item as usize,
+            Operation::Add(value) => value.overflowing_add(item).0,
+            Operation::Multiply(value) => value.overflowing_mul(item).0,
+            Operation::Square => item.overflowing_mul(item).0,
         };
 
-        result / 3
+        if relief {
+            result / 3
+        } else {
+            result % modulo
+        }
     }
 }
