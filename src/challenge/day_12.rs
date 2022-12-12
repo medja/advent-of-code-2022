@@ -65,17 +65,19 @@ fn find_path(map: &Map, direction: Direction) -> Vec<Vec<u16>> {
                 Direction::Down => neighbor_height == b'a',
             };
 
-            if !is_end {
-                let prioritize = match direction {
-                    Direction::Up => neighbor_height > height,
-                    Direction::Down => height < neighbor_height,
-                };
+            if is_end {
+                break;
+            }
 
-                if prioritize {
-                    queue.push_front(neighbor);
-                } else {
-                    queue.push_back(neighbor);
-                }
+            let prioritize = match direction {
+                Direction::Up => neighbor_height > height,
+                Direction::Down => height < neighbor_height,
+            };
+
+            if prioritize {
+                queue.push_front(neighbor);
+            } else {
+                queue.push_back(neighbor);
             }
         }
     }
