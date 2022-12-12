@@ -1,3 +1,4 @@
+use std::collections::VecDeque;
 use anyhow::{bail, Context};
 use std::ops::{Index, IndexMut};
 
@@ -33,7 +34,7 @@ pub fn part_b(input: &[&str]) -> anyhow::Result<impl std::fmt::Display> {
 }
 
 fn find_path(map: &Map, direction: Direction) -> Vec<Vec<u16>> {
-    let mut queue = Vec::new();
+    let mut queue = VecDeque::new();
     let mut neighbors = Vec::with_capacity(4);
     let mut scores = vec![vec![u16::MAX; map.width as usize]; map.height as usize];
 
@@ -42,10 +43,11 @@ fn find_path(map: &Map, direction: Direction) -> Vec<Vec<u16>> {
         Direction::Down => map.end,
     };
 
-    queue.push(start);
+    queue.push_front(start);
     scores[start] = 0;
 
-    while let Some(position) = queue.pop() {
+    while let Some(position) = queue.pop_front() {
+        let height = map.grid[position];
         let score = scores[position] + 1;
         map.fill_neighbors(position, direction, &mut neighbors);
 
@@ -56,13 +58,24 @@ fn find_path(map: &Map, direction: Direction) -> Vec<Vec<u16>> {
 
             scores[neighbor] = score;
 
+            let neighbor_height = map.grid[neighbor];
+
             let is_end = match direction {
                 Direction::Up => neighbor == map.end,
-                Direction::Down => map.grid[neighbor] == b'a',
+                Direction::Down => neighbor_height == b'a',
             };
 
             if !is_end {
-                queue.push(neighbor);
+                let prioritize = match direction {
+                    Direction::Up => neighbor_height > height,
+                    Direction::Down => height < neighbor_height,
+                };
+
+                if prioritize {
+                    queue.push_front(neighbor);
+                } else {
+                    queue.push_back(neighbor);
+                }
             }
         }
     }
