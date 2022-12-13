@@ -1,116 +1,171 @@
-use anyhow::Context;
 use std::cmp::Ordering;
 use std::iter::Peekable;
-use std::str::FromStr;
 
 pub fn part_a(input: &[&str]) -> anyhow::Result<impl std::fmt::Display> {
-    let result = input
-        .chunks(3)
+    let result = parse(input)
+        .chunks(2)
         .enumerate()
-        .filter(|(_, chunk)| compare(chunk[0], chunk[1]).unwrap_or(false))
+        .filter(|(_, chunk)| chunk[0].cmp(&chunk[1]) == Ordering::Less)
         .map(|(index, _)| index + 1)
         .sum::<usize>();
 
     Ok(result)
 }
 
-fn compare(left: &str, right: &str) -> anyhow::Result<bool> {
-    let left = Item::from_str(left)?;
-    let right = Item::from_str(right)?;
-    Ok(left.cmp(&right) == Ordering::Less)
-}
-
 pub fn part_b(input: &[&str]) -> anyhow::Result<impl std::fmt::Display> {
-    let divider_2 = Item::List(vec![Item::List(vec![Item::Number(2)])]);
-    let divider_6 = Item::List(vec![Item::List(vec![Item::Number(6)])]);
-    let mut items = Vec::with_capacity(2 + (input.len() + 1) / 3);
+    let divider_2 = Signal::divider(2);
+    let divider_6 = Signal::divider(6);
 
-    let input_items = input
-        .iter()
-        .filter(|line| !line.is_empty())
-        .filter_map(|line| Item::from_str(line).ok());
+    let mut signals = parse(input);
+    signals.push(divider_2.clone());
+    signals.push(divider_6.clone());
+    signals.sort();
 
-    items.push(divider_2.clone());
-    items.push(divider_6.clone());
-    items.extend(input_items);
-    items.sort();
-
-    let x = items.iter().position(|item| item == &divider_2).unwrap() + 1;
-    let y = items.iter().position(|item| item == &divider_6).unwrap() + 1;
-    Ok(x * y)
+    let first = signals.iter().position(|item| item == &divider_2).unwrap() + 1;
+    let second = signals.iter().position(|item| item == &divider_6).unwrap() + 1;
+    Ok(first * second)
 }
 
 #[derive(Eq, PartialEq, Clone)]
-enum Item {
-    Number(u8),
-    List(Vec<Item>),
+enum Token {
+    ArrayStart(u8),
+    ArrayEnd(u8),
+    Value(u8),
 }
 
-impl Ord for Item {
-    fn cmp(&self, other: &Self) -> Ordering {
-        compare_items(self, other)
+enum Item<'a> {
+    Value(u8),
+    Array(&'a [Token]),
+}
+
+#[derive(Eq, PartialEq, Clone)]
+struct Signal(Vec<Token>);
+
+impl Signal {
+    fn divider(value: u8) -> Self {
+        let tokens = vec![
+            Token::ArrayStart(4),
+            Token::ArrayStart(2),
+            Token::Value(value),
+            Token::ArrayEnd(1),
+            Token::ArrayEnd(0),
+        ];
+
+        Signal(tokens)
     }
 }
 
-impl PartialOrd for Item {
+impl Ord for Signal {
+    fn cmp(&self, other: &Self) -> Ordering {
+        compare(&self.0, &other.0)
+    }
+}
+
+impl PartialOrd for Signal {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
     }
 }
 
-impl FromStr for Item {
-    type Err = anyhow::Error;
-
-    fn from_str(input: &str) -> Result<Self, Self::Err> {
-        parse(&mut input.bytes().peekable())
-    }
+fn parse(input: &[&str]) -> Vec<Signal> {
+    input
+        .iter()
+        .filter(|line| !line.is_empty())
+        .map(|line| parse_signal(&mut line.bytes().peekable(), line.len()))
+        .collect::<Vec<_>>()
 }
 
-fn compare_items(left: &Item, right: &Item) -> Ordering {
-    use Item::*;
+fn parse_signal(input: &mut Peekable<impl Iterator<Item = u8>>, size_hint: usize) -> Signal {
+    let mut tokens = Vec::with_capacity(size_hint);
+    let mut depth = 0;
 
-    match (left, right) {
-        (Number(left), Number(right)) => left.cmp(right),
-        (Number(left), List(right)) => compare_lists(&vec![Number(*left)], right),
-        (List(left), Number(right)) => compare_lists(left, &vec![Number(*right)]),
-        (List(left), List(right)) => compare_lists(left, right),
-    }
-}
-
-fn compare_lists(left: &Vec<Item>, right: &Vec<Item>) -> Ordering {
-    let default = left.len().cmp(&right.len());
-
-    left.iter()
-        .zip(right)
-        .map(|(left, right)| compare_items(left, right))
-        .find(|ordering| *ordering != Ordering::Equal)
-        .unwrap_or(default)
-}
-
-fn parse(input: &mut Peekable<impl Iterator<Item = u8>>) -> anyhow::Result<Item> {
-    let next = input.next().context("Unexpected end of input")?;
-
-    if next == b'[' {
-        let mut items = Vec::new();
-
-        while matches!(input.peek(), Some(char) if *char != b']') {
-            items.push(parse(input)?);
-
-            if matches!(input.peek(), Some(b',')) {
-                input.next();
+    while let Some(char) = input.next() {
+        match char {
+            b'[' => {
+                tokens.push(Token::ArrayStart(depth));
+                depth += 1;
             }
+            b']' => {
+                depth -= 1;
+                tokens.push(Token::ArrayEnd(depth));
+            }
+            b',' => {}
+            _ if char.is_ascii_digit() => {
+                let mut value = char - b'0';
+
+                if matches!(input.peek(), Some(char) if char.is_ascii_digit()) {
+                    value = 10 * value + input.next().unwrap() - b'0';
+                }
+
+                tokens.push(Token::Value(value));
+            }
+            _ => unreachable!(),
+        }
+    }
+
+    replace_depths_with_lengths(&mut tokens);
+
+    Signal(tokens)
+}
+
+fn replace_depths_with_lengths(tokens: &mut [Token]) {
+    for i in 0..tokens.len() {
+        let (head, tail) = tokens.split_at_mut(i + 1);
+
+        if let Token::ArrayStart(depth) = &mut head[i] {
+            *depth = tail
+                .iter()
+                .position(|token| matches!(token, Token::ArrayEnd(i) if i == depth))
+                .unwrap() as u8
+                + 1;
+        }
+    }
+}
+
+fn compare(mut left: &[Token], mut right: &[Token]) -> Ordering {
+    while !left.is_empty() && !right.is_empty() {
+        let (left_item, left_remainder) = take_item(left);
+        let (right_item, right_remainder) = take_item(right);
+
+        let ordering = compare_items(left_item, right_item);
+
+        if ordering != Ordering::Equal {
+            return ordering;
         }
 
-        input.next();
+        left = left_remainder;
+        right = right_remainder;
+    }
 
-        Ok(Item::List(items))
+    if !left.is_empty() {
+        Ordering::Greater
+    } else if !right.is_empty() {
+        Ordering::Less
     } else {
-        let mut number = next - b'0';
+        Ordering::Equal
+    }
+}
 
-        while matches!(input.peek(), Some(char) if char.is_ascii_digit()) {
-            number = 10 * number + input.next().unwrap() - b'0';
+fn take_item(tokens: &[Token]) -> (Item, &[Token]) {
+    match &tokens[0] {
+        Token::Value(value) => (Item::Value(*value), &tokens[1..]),
+        Token::ArrayStart(length) => {
+            let length = *length as usize;
+            (Item::Array(&tokens[1..length]), &tokens[length + 1..])
         }
+        _ => unreachable!(),
+    }
+}
 
-        Ok(Item::Number(number))
+fn compare_items(left: Item, right: Item) -> Ordering {
+    match (left, right) {
+        (Item::Array(left), Item::Array(right)) => compare(left, right),
+        (Item::Array(left), Item::Value(right)) => {
+            compare(left, std::slice::from_ref(&Token::Value(right)))
+        }
+        (Item::Value(left), Item::Array(right)) => {
+            compare(std::slice::from_ref(&Token::Value(left)), right)
+        }
+        (Item::Value(left), Item::Value(right)) => left.cmp(&right),
     }
 }
