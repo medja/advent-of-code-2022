@@ -1,5 +1,5 @@
-use std::collections::VecDeque;
 use anyhow::{bail, Context};
+use std::collections::VecDeque;
 use std::ops::{Index, IndexMut};
 
 pub fn part_a(input: &[&str]) -> anyhow::Result<impl std::fmt::Display> {
