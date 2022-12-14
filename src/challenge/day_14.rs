@@ -12,24 +12,14 @@ const WIDTH: usize = MAX_X - MIN_X + 1;
 const HEIGHT: usize = MAX_Y - MIN_Y + 1;
 
 pub fn part_a(input: &[&str]) -> anyhow::Result<impl std::fmt::Display> {
-    solve(input, false)
+    Ok(Cave::new(input)?.simulate_sand_without_floor())
 }
 
 pub fn part_b(input: &[&str]) -> anyhow::Result<impl std::fmt::Display> {
-    solve(input, true)
+    Ok(Cave::new(input)?.simulate_sand_with_floor())
 }
 
-fn solve(input: &[&str], with_floor: bool) -> anyhow::Result<usize> {
-    let mut cave = Cave::new(input)?;
-    let mut count = 0;
-
-    while cave.simulate_sand(with_floor) {
-        count += 1;
-    }
-
-    Ok(count)
-}
-
+#[derive(Clone)]
 struct Coordinate {
     x: usize,
     y: usize,
@@ -102,14 +92,47 @@ impl Cave {
         Ok(Cave { grid, bottom })
     }
 
-    fn simulate_sand(&mut self, with_floor: bool) -> bool {
+    fn simulate_sand_with_floor(&mut self) -> usize {
+        let mut count = 0;
+        let mut queue = Vec::new();
+
+        queue.push(Coordinate::SAND_SOURCE);
+
+        while let Some(mut position) = queue.pop() {
+            if self.grid[position.y][position.x] {
+                continue;
+            }
+
+            self.grid[position.y][position.x] = true;
+            count += 1;
+
+            if position.y == self.bottom {
+                continue;
+            }
+
+            position.y += 1;
+            queue.push(position.clone());
+            position.x -= 1;
+            queue.push(position.clone());
+            position.x += 2;
+            queue.push(position);
+        }
+
+        count
+    }
+
+    fn simulate_sand_without_floor(&mut self) -> usize {
+        (1..).take_while(|_| self.drop_sand()).count()
+    }
+
+    fn drop_sand(&mut self) -> bool {
         let mut position = Coordinate::SAND_SOURCE;
 
         if self.grid[position.y][position.x] {
             return false;
         }
 
-        while position.y < self.bottom {
+        loop {
             position.y += 1;
 
             if self.grid[position.y][position.x] {
@@ -122,14 +145,14 @@ impl Cave {
                     break;
                 }
             }
+
+            if position.y == self.bottom {
+                return false;
+            }
         }
 
-        if position.y == self.bottom && !with_floor {
-            false
-        } else {
-            self.grid[position.y][position.x] = true;
-            true
-        }
+        self.grid[position.y][position.x] = true;
+        true
     }
 }
 
