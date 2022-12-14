@@ -3,19 +3,27 @@ use std::ops::RangeInclusive;
 use std::str::FromStr;
 
 // Assume we won't go out of these bounds for any input
-const MIN_X: usize = 445;
-const MAX_X: usize = 505;
-const MIN_Y: usize = 10;
-const MAX_Y: usize = 500;
+const MIN_X: usize = 300;
+const MAX_X: usize = 700;
+const MIN_Y: usize = 0;
+const MAX_Y: usize = 180;
 
 const WIDTH: usize = MAX_X - MIN_X + 1;
 const HEIGHT: usize = MAX_Y - MIN_Y + 1;
 
 pub fn part_a(input: &[&str]) -> anyhow::Result<impl std::fmt::Display> {
+    solve(input, false)
+}
+
+pub fn part_b(input: &[&str]) -> anyhow::Result<impl std::fmt::Display> {
+    solve(input, true)
+}
+
+fn solve(input: &[&str], with_floor: bool) -> anyhow::Result<usize> {
     let mut cave = Cave::new(input)?;
     let mut count = 0;
 
-    while cave.simulate_sand() {
+    while cave.simulate_sand(with_floor) {
         count += 1;
     }
 
@@ -51,10 +59,12 @@ impl FromStr for Coordinate {
 
 struct Cave {
     grid: Vec<Vec<bool>>,
+    bottom: usize,
 }
 
 impl Cave {
     fn new(input: &[&str]) -> anyhow::Result<Self> {
+        let mut bottom = 0;
         let mut grid = vec![vec![false; WIDTH]; HEIGHT];
 
         for line in input {
@@ -68,6 +78,10 @@ impl Cave {
 
                 if start.x != end.x {
                     let y = start.y - MIN_Y;
+
+                    if y > bottom {
+                        bottom = y;
+                    }
 
                     for x in build_range(start.x - MIN_X, end.x - MIN_X) {
                         grid[y][x] = true;
@@ -84,25 +98,24 @@ impl Cave {
             }
         }
 
-        Ok(Cave { grid })
+        bottom += 1;
+        Ok(Cave { grid, bottom })
     }
 
-    fn simulate_sand(&mut self) -> bool {
+    fn simulate_sand(&mut self, with_floor: bool) -> bool {
         let mut position = Coordinate::SAND_SOURCE;
 
-        loop {
+        if self.grid[position.y][position.x] {
+            return false;
+        }
+
+        while position.y < self.bottom {
             position.y += 1;
 
-            if position.y == HEIGHT {
-                return false;
-            }
-
             if self.grid[position.y][position.x] {
-                let next_x = position.x + 1;
-
-                if position.x > 0 && !self.grid[position.y][position.x - 1] {
+                if !self.grid[position.y][position.x - 1] {
                     position.x -= 1;
-                } else if next_x < WIDTH && !self.grid[position.y][next_x] {
+                } else if !self.grid[position.y][position.x + 1] {
                     position.x += 1;
                 } else {
                     position.y -= 1;
@@ -111,8 +124,12 @@ impl Cave {
             }
         }
 
-        self.grid[position.y][position.x] = true;
-        true
+        if position.y == self.bottom && !with_floor {
+            false
+        } else {
+            self.grid[position.y][position.x] = true;
+            true
+        }
     }
 }
 
