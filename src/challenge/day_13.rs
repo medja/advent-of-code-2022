@@ -15,15 +15,19 @@ pub fn part_a(input: &[&str]) -> anyhow::Result<impl std::fmt::Display> {
 pub fn part_b(input: &[&str]) -> anyhow::Result<impl std::fmt::Display> {
     let divider_2 = Signal::divider(2);
     let divider_6 = Signal::divider(6);
+    let signals = parse(input);
 
-    let mut signals = parse(input);
-    signals.push(divider_2.clone());
-    signals.push(divider_6.clone());
-    signals.sort();
+    let first = signals
+        .iter()
+        .filter(|&signal| signal.cmp(&divider_2) == Ordering::Less)
+        .count();
 
-    let first = signals.iter().position(|item| item == &divider_2).unwrap() + 1;
-    let second = signals.iter().position(|item| item == &divider_6).unwrap() + 1;
-    Ok(first * second)
+    let second = signals
+        .iter()
+        .filter(|&signal| signal.cmp(&divider_6) == Ordering::Less)
+        .count();
+
+    Ok((first + 1) * (second + 2))
 }
 
 #[derive(Eq, PartialEq, Clone)]
