@@ -45,31 +45,33 @@ pub fn part_b(input: &[&str]) -> anyhow::Result<impl std::fmt::Display> {
     const MAX: isize = 4000000;
 
     let regions = parse_regions(input)?;
-    let mut ranges = Vec::new();
 
-    for y in 0..MAX {
-        ranges.clear();
-        ranges.extend(regions.iter().filter_map(|region| region.range_at_y(y)));
-        ranges.sort_by_key(|range| range.start);
+    let mut lines_up = Vec::with_capacity(regions.len() * 2); // y = n + x
+    let mut lines_down = Vec::with_capacity(regions.len() * 2); // y = n - x
 
-        let mut last_end = 0;
+    for region in &regions {
+        let distance = region.distance() as isize + 1;
 
-        for range in &ranges {
-            let x = last_end + 1;
+        lines_up.push(region.sensor_y - distance - region.sensor_x);
+        lines_up.push(region.sensor_y + distance - region.sensor_x);
+        lines_down.push(region.sensor_y - distance + region.sensor_x);
+        lines_down.push(region.sensor_y + distance + region.sensor_x);
+    }
 
-            if x < range.start {
+    // line_up = n in y = n + x
+    // line_up = n in y = n - x
+    for &line_up in &lines_up {
+        for &line_down in &lines_down {
+            // intersection of the two lines
+            let x = (line_down - line_up) / 2;
+            let y = x + line_up;
+
+            if (0..=MAX).contains(&x)
+                && (0..=MAX).contains(&y)
+                && !regions.iter().any(|region| region.contains(x, y))
+            {
                 return Ok(x * MAX + y);
             }
-
-            last_end = last_end.max(range.end);
-
-            if last_end >= MAX {
-                break;
-            }
-        }
-
-        if last_end < MAX {
-            return Ok(MAX * MAX + y);
         }
     }
 
@@ -95,6 +97,11 @@ struct Region {
 impl Region {
     fn distance(&self) -> usize {
         self.sensor_x.abs_diff(self.beacon_x) + self.sensor_y.abs_diff(self.beacon_y)
+    }
+
+    fn contains(&self, x: isize, y: isize) -> bool {
+        let distance = self.sensor_x.abs_diff(x) + self.sensor_y.abs_diff(y);
+        distance <= self.distance()
     }
 
     fn range_at_y(&self, y: isize) -> Option<Range> {
