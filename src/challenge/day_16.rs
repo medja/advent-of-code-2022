@@ -1,3 +1,4 @@
+use std::cmp::Reverse;
 use std::collections::HashMap;
 
 const MAX_LINKS: usize = 5;
@@ -5,7 +6,45 @@ const MAX_LINKS: usize = 5;
 pub fn part_a(input: &[&str]) -> anyhow::Result<impl std::fmt::Display> {
     let graph = Graph::new(input);
     let solutions = find_solutions(graph.valves.len(), 30, graph.closed_valves, &graph);
-    Ok(solutions.into_iter().max().unwrap())
+
+    let max_pressure = solutions
+        .into_iter()
+        .map(|solution| solution.total_pressure)
+        .max()
+        .unwrap();
+
+    Ok(max_pressure)
+}
+
+pub fn part_b(input: &[&str]) -> anyhow::Result<impl std::fmt::Display> {
+    let graph = Graph::new(input);
+
+    let mut solutions = find_solutions(graph.valves.len(), 26, graph.closed_valves, &graph);
+    solutions.sort_by_key(|solution| Reverse(solution.total_pressure));
+
+    let valves = solutions[0].valves;
+    let lower_bound = solutions[1..]
+        .iter()
+        .position(|solution| !solution.valves.overlaps(valves))
+        .unwrap();
+
+    let mut max_pressure = solutions[0].total_pressure + solutions[lower_bound].total_pressure;
+
+    for (index, player) in solutions[1..lower_bound - 1].iter().enumerate() {
+        for elephant in solutions[index + 1..lower_bound].iter() {
+            if player.valves.overlaps(elephant.valves) {
+                continue;
+            }
+
+            let total_pressure = player.total_pressure + elephant.total_pressure;
+
+            if total_pressure > max_pressure {
+                max_pressure = total_pressure;
+            }
+        }
+    }
+
+    Ok(max_pressure)
 }
 
 fn find_solutions(
@@ -13,7 +52,7 @@ fn find_solutions(
     remaining_time: usize,
     closed_valves: ValveSet,
     graphs: &Graph,
-) -> Vec<usize> {
+) -> Vec<Solution> {
     let state = State {
         id,
         remaining_time,
@@ -54,11 +93,21 @@ fn find_solutions(
         }
 
         if length == states.len() {
-            solutions.push(state.total_pressure);
+            let solution = Solution {
+                valves: closed_valves.diff(state.closed_valves),
+                total_pressure: state.total_pressure,
+            };
+
+            solutions.push(solution);
         }
     }
 
     solutions
+}
+
+struct Solution {
+    valves: ValveSet,
+    total_pressure: usize,
 }
 
 struct State {
@@ -210,6 +259,14 @@ impl ValveSet {
     fn contains(self, valve: usize) -> bool {
         let mask = 1 << valve;
         self.0 & mask == mask
+    }
+
+    fn overlaps(self, other: Self) -> bool {
+        self.0 & other.0 != 0
+    }
+
+    fn diff(self, other: Self) -> Self {
+        ValveSet(self.0 & !other.0)
     }
 
     fn remove(self, valve: usize) -> Self {
