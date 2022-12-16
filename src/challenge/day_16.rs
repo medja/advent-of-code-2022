@@ -4,48 +4,68 @@ const MAX_LINKS: usize = 5;
 
 pub fn part_a(input: &[&str]) -> anyhow::Result<impl std::fmt::Display> {
     let graph = Graph::new(input);
-
-    let result = best_pressure(
-        graph.valves.len(),
-        30,
-        graph.closed_valves,
-        &graph,
-    );
-
-    Ok(result)
+    let solutions = find_solutions(graph.valves.len(), 30, graph.closed_valves, &graph);
+    Ok(solutions.into_iter().max().unwrap())
 }
 
-fn best_pressure(
+fn find_solutions(
     id: usize,
     remaining_time: usize,
     closed_valves: ValveSet,
     graphs: &Graph,
-) -> usize {
-    let mut best_score = 0;
+) -> Vec<usize> {
+    let state = State {
+        id,
+        remaining_time,
+        closed_valves,
+        total_pressure: 0,
+    };
 
-    for (link, valve) in graphs.valves.iter().enumerate() {
-        if !closed_valves.contains(link) {
-            continue;
+    let mut solutions = Vec::with_capacity(220000);
+    let mut states = Vec::with_capacity(140000);
+    states.push(state);
+
+    while let Some(state) = states.pop() {
+        let length = states.len();
+
+        for (id, valve) in graphs.valves.iter().enumerate() {
+            if !state.closed_valves.contains(id) {
+                continue;
+            }
+
+            let effort = graphs.distance(state.id, id) + 1;
+
+            if effort > state.remaining_time {
+                continue;
+            }
+
+            let remaining_time = state.remaining_time - effort;
+            let closed_valves = state.closed_valves.remove(id);
+            let total_pressure = state.total_pressure + valve.flow_rate * remaining_time;
+
+            let state = State {
+                id,
+                remaining_time,
+                closed_valves,
+                total_pressure,
+            };
+
+            states.push(state);
         }
 
-        let effort = graphs.distance(id, link) + 1;
-
-        if effort > remaining_time {
-            continue;
-        }
-
-        let remaining_time = remaining_time - effort;
-        let closed_valves = closed_valves.remove(link);
-
-        let score = valve.flow_rate * remaining_time
-            + best_pressure(link, remaining_time, closed_valves, graphs);
-
-        if score > best_score {
-            best_score = score;
+        if length == states.len() {
+            solutions.push(state.total_pressure);
         }
     }
 
-    best_score
+    solutions
+}
+
+struct State {
+    id: usize,
+    remaining_time: usize,
+    closed_valves: ValveSet,
+    total_pressure: usize,
 }
 
 struct Graph {
