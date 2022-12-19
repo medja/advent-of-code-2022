@@ -128,10 +128,10 @@ fn score_blueprint(blueprint: &Blueprint, time: u8) -> usize {
     state.minute = time;
     state.ore.production = 1;
 
-    simulate(blueprint, state) as usize
+    simulate(blueprint, state, 0) as usize
 }
 
-fn simulate(blueprint: &Blueprint, mut state: State) -> u8 {
+fn simulate(blueprint: &Blueprint, mut state: State, mut min_score: u8) -> u8 {
     if state.minute == 0 {
         return state.geode.count;
     }
@@ -147,81 +147,76 @@ fn simulate(blueprint: &Blueprint, mut state: State) -> u8 {
     state.obsidian.count += state.obsidian.production;
     state.geode.count += state.geode.production;
 
+    if compute_max_potential(&state) < min_score as usize {
+        return 0;
+    }
+
     let mut max_score = 0;
 
     if can_build_geode_robot {
-        let score = simulate_build_geode_robot(blueprint, state.clone());
-
-        if score > max_score {
-            max_score = score;
-        }
-
+        let score = simulate_build_geode_robot(blueprint, state.clone(), min_score);
+        max_score = max_score.max(score);
+        min_score = min_score.max(score);
         state.allowed_robots.remove(&Robot::GEODE);
     }
 
     if can_build_obsidian_robot {
-        let score = simulate_build_obsidian_robot(blueprint, state.clone());
-
-        if score > max_score {
-            max_score = score;
-        }
-
+        let score = simulate_build_obsidian_robot(blueprint, state.clone(), min_score);
+        max_score = max_score.max(score);
+        min_score = min_score.max(score);
         state.allowed_robots.remove(&Robot::OBSIDIAN);
     }
 
     if can_build_clay_robot {
-        let score = simulate_build_clay_robot(blueprint, state.clone());
-
-        if score > max_score {
-            max_score = score;
-        }
-
+        let score = simulate_build_clay_robot(blueprint, state.clone(), min_score);
+        max_score = max_score.max(score);
+        min_score = min_score.max(score);
         state.allowed_robots.remove(&Robot::CLAY);
     }
 
     if can_build_ore_robot {
-        let score = simulate_build_ore_robot(blueprint, state.clone());
-
-        if score > max_score {
-            max_score = score;
-        }
-
+        let score = simulate_build_ore_robot(blueprint, state.clone(), min_score);
+        max_score = max_score.max(score);
+        min_score = min_score.max(score);
         state.allowed_robots.remove(&Robot::ORE);
     }
 
-    let score = simulate(blueprint, state);
-
-    if score > max_score {
-        max_score = score;
-    }
-
-    max_score
+    let score = simulate(blueprint, state, min_score);
+    max_score.max(score)
 }
 
-fn simulate_build_ore_robot(blueprint: &Blueprint, mut state: State) -> u8 {
+fn compute_max_potential(state: &State) -> usize {
+    let minute = state.minute as usize;
+    let count = state.geode.count as usize;
+    let production = state.geode.production as usize;
+
+    count + (minute * (minute - 1) / 2) + (production * (minute.saturating_sub(1) + 1))
+}
+
+fn simulate_build_ore_robot(blueprint: &Blueprint, mut state: State, min_score: u8) -> u8 {
     state.ore.count -= blueprint.ore_robot_ore;
     state.ore.production += 1;
-    simulate(blueprint, state)
+    simulate(blueprint, state, min_score)
 }
 
-fn simulate_build_clay_robot(blueprint: &Blueprint, mut state: State) -> u8 {
+fn simulate_build_clay_robot(blueprint: &Blueprint, mut state: State, min_score: u8) -> u8 {
     state.ore.count -= blueprint.clay_robot_ore;
     state.clay.production += 1;
-    simulate(blueprint, state)
+    simulate(blueprint, state, min_score)
 }
 
-fn simulate_build_obsidian_robot(blueprint: &Blueprint, mut state: State) -> u8 {
+fn simulate_build_obsidian_robot(blueprint: &Blueprint, mut state: State, min_score: u8) -> u8 {
     state.ore.count -= blueprint.obsidian_robot_ore;
     state.clay.count -= blueprint.obsidian_robot_clay;
     state.obsidian.production += 1;
-    simulate(blueprint, state)
+    simulate(blueprint, state, min_score)
 }
 
-fn simulate_build_geode_robot(blueprint: &Blueprint, mut state: State) -> u8 {
+fn simulate_build_geode_robot(blueprint: &Blueprint, mut state: State, min_score: u8) -> u8 {
     state.ore.count -= blueprint.geode_robot_ore;
     state.obsidian.count -= blueprint.geode_robot_obsidian;
     state.geode.production += 1;
-    simulate(blueprint, state)
+    simulate(blueprint, state, min_score)
 }
 
 fn can_build_ore_robot(blueprint: &Blueprint, state: &State) -> bool {
