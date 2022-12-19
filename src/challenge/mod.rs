@@ -74,6 +74,7 @@ lazy_static! {
         solutions.add(Day18, PartA, day_18::part_a);
         solutions.add(Day18, PartB, day_18::part_b);
         solutions.add(Day19, PartA, day_19::part_a);
+        solutions.add(Day19, PartB, day_19::part_b);
 
         solutions
     };
