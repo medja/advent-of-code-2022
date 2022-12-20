@@ -124,8 +124,11 @@ impl Blueprint {
 }
 
 fn score_blueprint(blueprint: &Blueprint, time: u8) -> usize {
-    let mut state = State::default();
-    state.minute = time;
+    let mut state = State {
+        minute: time,
+        ..Default::default()
+    };
+
     state.ore.production = 1;
 
     simulate(blueprint, state, 0) as usize
@@ -189,8 +192,9 @@ fn compute_max_potential(state: &State) -> usize {
     let minute = state.minute as usize;
     let count = state.geode.count as usize;
     let production = state.geode.production as usize;
+    let minute_minus_one = minute.saturating_sub(1);
 
-    count + (minute * (minute - 1) / 2) + (production * (minute.saturating_sub(1) + 1))
+    count + (minute * minute_minus_one / 2) + (production * (minute_minus_one + 1))
 }
 
 fn simulate_build_ore_robot(blueprint: &Blueprint, mut state: State, min_score: u8) -> u8 {
