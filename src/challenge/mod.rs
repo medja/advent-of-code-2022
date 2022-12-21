@@ -80,6 +80,7 @@ lazy_static! {
         solutions.add(Day20, PartA, day_20::part_a);
         solutions.add(Day20, PartB, day_20::part_b);
         solutions.add(Day21, PartA, day_21::part_a);
+        solutions.add(Day21, PartB, day_21::part_b);
 
         solutions
     };
