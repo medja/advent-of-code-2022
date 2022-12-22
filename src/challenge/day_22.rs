@@ -29,25 +29,21 @@ fn solve(input: &[&str], cube: bool) -> usize {
         };
 
         for _ in 0..move_amount {
-            let next_position = position.move_one(direction);
-
-            match map.get(next_position) {
-                Tile::Air => {
-                    match map.find_opposite_tile(position, direction, cube) {
-                        None => break, // found a wall
-                        Some((next_position, next_direction)) => {
-                            position = next_position;
-                            direction = next_direction;
-                        }
-                    }
+            match map.find_next_position(position, direction, cube) {
+                Some((next_position, next_direction)) => {
+                    position = next_position;
+                    direction = next_direction;
                 }
-                Tile::Wall => break,
-                Tile::Ground => position = next_position,
+                None => break,
             }
         }
     }
 
-    1000 * position.y as usize + 4 * position.x as usize + u8::from(direction) as usize
+    let x = position.x as usize + 1;
+    let y = position.y as usize + 1;
+    let direction = u8::from(direction) as usize;
+
+    1000 * y + 4 * x + direction
 }
 
 #[derive(IntoPrimitive, FromPrimitive, Copy, Clone)]
@@ -83,15 +79,6 @@ struct Position {
 impl Position {
     fn new(x: u8, y: u8) -> Self {
         Position { x, y }
-    }
-
-    fn move_one(self, direction: Direction) -> Self {
-        match direction {
-            Direction::Right => Position::new(self.x + 1, self.y),
-            Direction::Down => Position::new(self.x, self.y + 1),
-            Direction::Left => Position::new(self.x - 1, self.y),
-            Direction::Up => Position::new(self.x, self.y - 1),
-        }
     }
 }
 
@@ -140,41 +127,25 @@ impl Map {
             .position(|tile| *tile == Tile::Ground)
             .unwrap();
 
-        Position::new(index as u8 + 1, 1)
+        Position::new(index as u8, 0)
     }
 
-    fn get(&self, position: Position) -> Tile {
-        let x = position.x as usize;
-        let y = position.y as usize;
-
-        if x == 0 || x > self.width || y == 0 || y > self.height {
-            Tile::Air
-        } else {
-            self.tiles[(x - 1) + (y - 1) * self.width]
+    fn is_on_edge(&self, position: Position, direction: Direction) -> bool {
+        match direction {
+            Direction::Right => position.x as usize + 1 == self.width,
+            Direction::Down => position.y as usize + 1 == self.height,
+            Direction::Left => position.x == 0,
+            Direction::Up => position.y == 0,
         }
     }
 
-    // Returns None if the tile on the opposite side of the map is a wall
-    fn find_opposite_tile(
+    fn find_next_position(
         &self,
         position: Position,
         direction: Direction,
         cube: bool,
     ) -> Option<(Position, Direction)> {
-        if cube {
-            self.find_opposite_tile_cube(position, direction)
-        } else {
-            self.find_opposite_tile_flat(position, direction)
-        }
-    }
-
-    // Finds the first non-Air tile wrapping around the map
-    fn find_opposite_tile_flat(
-        &self,
-        position: Position,
-        direction: Direction,
-    ) -> Option<(Position, Direction)> {
-        let (mut x, mut y) = (position.x as usize - 1, position.y as usize - 1);
+        let (sx, sy) = (position.x as usize, position.y as usize);
 
         let (dx, dy) = match direction {
             Direction::Right => (1, 0),
@@ -183,56 +154,65 @@ impl Map {
             Direction::Up => (0, self.height - 1),
         };
 
-        loop {
+        let (mut x, mut y) = ((sx + dx) % self.width, (sy + dy) % self.height);
+        let mut tile = self.tiles[x + y * self.width];
+
+        if cube && (tile == Tile::Air || self.is_on_edge(position, direction)) {
+            return self.find_next_cube_position(position, direction);
+        }
+
+        while tile == Tile::Air {
             x = (x + dx) % self.width;
             y = (y + dy) % self.height;
+            tile = self.tiles[x + y * self.width];
+        }
 
-            match self.tiles[x + y * self.width] {
-                Tile::Air => continue,
-                Tile::Wall => break None,
-                Tile::Ground => break Some((Position::new(x as u8 + 1, y as u8 + 1), direction)),
-            }
+        if tile == Tile::Ground {
+            Some((Position::new(x as u8, y as u8), direction))
+        } else {
+            None
         }
     }
 
-    // Finds the first position over the edge (along with the new direction relative to the map)
-    // It doesn't feel like this is supposed to support generic layout, but only the provided one
-    fn find_opposite_tile_cube(
+    fn find_next_cube_position(
         &self,
         position: Position,
         direction: Direction,
     ) -> Option<(Position, Direction)> {
+        let sx = position.x as usize;
+        let sy = position.y as usize;
+
         let (x, y, direction) = match direction {
-            Direction::Right => match position.y {
-                1..=50 => (99, 150 - position.y as usize, Direction::Left),
-                51..=100 => ((position.y as usize - 1) + 50, 49, Direction::Up),
-                101..=150 => (149, 150 - position.y as usize, Direction::Left),
-                151..=200 => ((position.y as usize - 1) - 100, 149, Direction::Up),
+            Direction::Right => match sy {
+                0..=49 => (99, 149 - sy, Direction::Left),
+                50..=99 => (sy + 50, 49, Direction::Up),
+                100..=149 => (149, 149 - sy, Direction::Left),
+                150..=199 => (sy - 100, 149, Direction::Up),
                 _ => unreachable!(),
             },
-            Direction::Down => match position.x {
-                1..=50 => ((position.x as usize - 1) + 100, 0, Direction::Down),
-                51..=100 => (49, (position.x as usize - 1) + 100, Direction::Left),
-                101..=150 => (99, (position.x as usize - 1) - 50, Direction::Left),
+            Direction::Down => match sx {
+                0..=49 => (sx + 100, 0, Direction::Down),
+                50..=99 => (49, sx + 100, Direction::Left),
+                100..=149 => (99, sx - 50, Direction::Left),
                 _ => unreachable!(),
             },
-            Direction::Left => match position.y {
-                1..=50 => (0, 150 - position.y as usize, Direction::Right),
-                51..=100 => ((position.y as usize - 1) - 50, 100, Direction::Down),
-                101..=150 => (50, 150 - position.y as usize, Direction::Right),
-                151..=200 => ((position.y as usize - 1) - 100, 0, Direction::Down),
+            Direction::Left => match sy {
+                0..=49 => (0, 149 - sy, Direction::Right),
+                50..=99 => (sy - 50, 100, Direction::Down),
+                100..=149 => (50, 149 - sy, Direction::Right),
+                150..=199 => (sy - 100, 0, Direction::Down),
                 _ => unreachable!(),
             },
-            Direction::Up => match position.x {
-                1..=50 => (50, (position.x as usize - 1) + 50, Direction::Right),
-                51..=100 => (0, (position.x as usize - 1) + 100, Direction::Right),
-                101..=150 => ((position.x as usize - 1) - 100, 199, Direction::Up),
+            Direction::Up => match sx {
+                0..=49 => (50, sx + 50, Direction::Right),
+                50..=99 => (0, sx + 100, Direction::Right),
+                100..=149 => (sx - 100, 199, Direction::Up),
                 _ => unreachable!(),
             },
         };
 
         if self.tiles[x + y * self.width] == Tile::Ground {
-            Some((Position::new(x as u8 + 1, y as u8 + 1), direction))
+            Some((Position::new(x as u8, y as u8), direction))
         } else {
             None
         }
