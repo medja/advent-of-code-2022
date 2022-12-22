@@ -174,47 +174,24 @@ impl Map {
         position: Position,
         direction: Direction,
     ) -> Option<(Position, Direction)> {
-        let (x, y, tile) = match direction {
-            Direction::Right => {
-                let y = position.y as usize - 1;
-                let (x, tile) = (0..self.width)
-                    .map(|x| (x, self.tiles[x + y * self.width]))
-                    .find(|(_, tile)| *tile != Tile::Air)
-                    .unwrap();
-                (x, y, tile)
-            }
-            Direction::Down => {
-                let x = position.x as usize - 1;
-                let (y, tile) = (0..self.height)
-                    .map(|y| (y, self.tiles[x + y * self.width]))
-                    .find(|(_, tile)| *tile != Tile::Air)
-                    .unwrap();
-                (x, y, tile)
-            }
-            Direction::Left => {
-                let y = position.y as usize - 1;
-                let (x, tile) = (0..self.width)
-                    .rev()
-                    .map(|x| (x, self.tiles[x + y * self.width]))
-                    .find(|(_, tile)| *tile != Tile::Air)
-                    .unwrap();
-                (x, y, tile)
-            }
-            Direction::Up => {
-                let x = position.x as usize - 1;
-                let (y, tile) = (0..self.height)
-                    .rev()
-                    .map(|y| (y, self.tiles[x + y * self.width]))
-                    .find(|(_, tile)| *tile != Tile::Air)
-                    .unwrap();
-                (x, y, tile)
-            }
+        let (mut x, mut y) = (position.x as usize - 1, position.y as usize - 1);
+
+        let (dx, dy) = match direction {
+            Direction::Right => (1, 0),
+            Direction::Down => (0, 1),
+            Direction::Left => (self.width - 1, 0),
+            Direction::Up => (0, self.height - 1),
         };
 
-        if tile == Tile::Ground {
-            Some((Position::new(x as u8 + 1, y as u8 + 1), direction))
-        } else {
-            None
+        loop {
+            x = (x + dx) % self.width;
+            y = (y + dy) % self.height;
+
+            match self.tiles[x + y * self.width] {
+                Tile::Air => continue,
+                Tile::Wall => break None,
+                Tile::Ground => break Some((Position::new(x as u8 + 1, y as u8 + 1), direction)),
+            }
         }
     }
 
