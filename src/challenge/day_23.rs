@@ -1,6 +1,6 @@
 use std::ops::Add;
 
-const PADDING: usize = 10;
+const PADDING: usize = 80;
 
 const DIRECTIONS: [(i8, i8); 8] = [
     (0, -1),
@@ -32,7 +32,21 @@ pub fn part_a(input: &[&str]) -> anyhow::Result<impl std::fmt::Display> {
     Ok(map.score())
 }
 
-#[derive(Copy, Clone)]
+pub fn part_b(input: &[&str]) -> anyhow::Result<impl std::fmt::Display> {
+    let mut moves = MOVES;
+    let mut map = Map::new(input);
+
+    let mut round = 1;
+
+    while !map.simulate(moves) {
+        round += 1;
+        moves.rotate_left(1);
+    }
+
+    Ok(round)
+}
+
+#[derive(Eq, PartialEq, Copy, Clone)]
 struct Position {
     x: u8,
     y: u8,
@@ -96,14 +110,12 @@ impl Map {
             }
         }
 
-        Map {
-            width,
-            elves,
-            grid,
-        }
+        Map { width, elves, grid }
     }
 
-    fn simulate(&mut self, moves: [[usize; 3]; 4]) {
+    fn simulate(&mut self, moves: [[usize; 3]; 4]) -> bool {
+        let mut stable = true;
+
         for elf in &mut self.elves {
             let neighbors = DIRECTIONS.map(|direction| elf.current_position + direction);
 
@@ -113,6 +125,8 @@ impl Map {
             {
                 continue;
             }
+
+            stable = false;
 
             let next_position = moves
                 .iter()
@@ -130,6 +144,10 @@ impl Map {
         }
 
         for elf in &mut self.elves {
+            if elf.current_position == elf.next_position {
+                continue;
+            }
+
             let index = elf.next_position.index(self.width);
             let count = self.grid[index];
 
@@ -137,10 +155,16 @@ impl Map {
                 self.grid[elf.current_position.index(self.width)] = 0;
                 self.grid[index] = u8::MAX;
                 elf.current_position = elf.next_position;
-            } else if count > 1 && count != u8::MAX {
-                self.grid[index] = 0;
+            } else {
+                if count > 1 && count != u8::MAX {
+                    self.grid[index] = 0;
+                }
+
+                elf.next_position = elf.current_position;
             }
         }
+
+        stable
     }
 
     fn score(&self) -> usize {
