@@ -1,34 +1,71 @@
 use std::collections::VecDeque;
 
 pub fn part_a(input: &[&str]) -> anyhow::Result<impl std::fmt::Display> {
-    Ok(find_path(Valley::new(input)))
+    let mut valley = Valley::new(input);
+    valley.predict();
+    Ok(find_path(Position::START, valley.exit(), &mut valley))
 }
 
-fn find_path(mut valley: Valley) -> usize {
+pub fn part_b(input: &[&str]) -> anyhow::Result<impl std::fmt::Display> {
+    let mut valley = Valley::new(input);
     let exit = valley.exit();
-    let mut minute = 0;
     valley.predict();
 
-    while !valley.get(Position::START).will_be_empty() {
+    let there = find_path(Position::START, exit, &mut valley);
+    let back = find_path(exit, Position::START, &mut valley);
+    let finish = find_path(Position::START, exit, &mut valley);
+
+    Ok(there + back + finish)
+}
+
+// BFS search for best path
+fn find_path(start: Position, end: Position, valley: &mut Valley) -> usize {
+    let mut minute = 0;
+
+    // Wait until we can make out first move
+    while !valley.get(start).will_be_empty() {
+        minute += 1;
         valley.simulate();
         valley.predict();
-        minute += 1;
     }
 
     let mut queue = VecDeque::new();
     let mut next_positions = vec![false; valley.width * valley.height];
-    queue.push_back(State::new(minute + 1, Position::START));
+    queue.push_back(State::new(minute + 1, start));
 
-    while let Some(state) = queue.pop_front() {
-        if state.position == exit {
-            return state.minute as usize + 1;
-        }
+    loop {
+        let state = queue.pop_front();
 
-        if state.minute > minute {
+        // None means we couldn't find a path
+        // But that's not the end since it's valid and safe to stay before the starting position
+        if !matches!(&state, Some(state) if state.minute == minute) {
+            minute += 1;
+
+            // Simulate waiting before the starting position
+            if valley.get(start).will_be_empty() {
+                let index = start.x as usize + (start.y as usize) * valley.width;
+
+                if !next_positions[index] {
+                    queue.push_back(State::new(minute, start));
+                }
+            }
+
             valley.simulate();
             valley.predict();
-            minute = state.minute;
             next_positions.fill(false);
+        }
+
+        // Process next move (if one exists)
+        let state = match state {
+            Some(state) => state,
+            None => continue,
+        };
+
+        if state.position == end {
+            // Simulate moving out of the valley
+            valley.simulate();
+            valley.predict();
+            return state.minute as usize + 1;
         }
 
         for position in state.position.find_moves(valley.width, valley.height) {
@@ -42,8 +79,6 @@ fn find_path(mut valley: Valley) -> usize {
             }
         }
     }
-
-    unreachable!()
 }
 
 struct State {
@@ -129,22 +164,14 @@ impl Iterator for Moves {
     }
 }
 
-#[derive(Copy, Clone)]
-struct Blizzard {
-    mask: u8,
-    dx: i8,
-    dy: i8,
-}
+#[derive(Eq, PartialEq, Copy, Clone)]
+struct Blizzard(u8);
 
 impl Blizzard {
-    const fn new(mask: u8, dx: i8, dy: i8) -> Self {
-        Blizzard { mask, dx, dy }
-    }
-
-    const UP: Blizzard = Blizzard::new(1 << 0, 0, -1);
-    const RIGHT: Blizzard = Blizzard::new(1 << 1, 1, 0);
-    const DOWN: Blizzard = Blizzard::new(1 << 2, 0, 1);
-    const LEFT: Blizzard = Blizzard::new(1 << 3, -1, 0);
+    const UP: Blizzard = Blizzard(1 << 0);
+    const RIGHT: Blizzard = Blizzard(1 << 1);
+    const DOWN: Blizzard = Blizzard(1 << 2);
+    const LEFT: Blizzard = Blizzard(1 << 3);
 
     const ALL: [Blizzard; 4] = [
         Blizzard::UP,
@@ -154,16 +181,18 @@ impl Blizzard {
     ];
 }
 
+// Stores the current blizzards are stored in the 4 least significant bits and the upcoming
+// blizzards in the next 4 bits
 #[derive(Copy, Clone)]
 struct Tile(u8);
 
 impl Tile {
     fn new(byte: u8) -> Self {
         match byte {
-            b'^' => Tile(Blizzard::UP.mask),
-            b'>' => Tile(Blizzard::RIGHT.mask),
-            b'v' => Tile(Blizzard::DOWN.mask),
-            b'<' => Tile(Blizzard::LEFT.mask),
+            b'^' => Tile(Blizzard::UP.0),
+            b'>' => Tile(Blizzard::RIGHT.0),
+            b'v' => Tile(Blizzard::DOWN.0),
+            b'<' => Tile(Blizzard::LEFT.0),
             b'.' => Tile(0),
             _ => unreachable!(),
         }
@@ -174,11 +203,11 @@ impl Tile {
     }
 
     fn contains(self, blizzard: Blizzard) -> bool {
-        self.0 & blizzard.mask == blizzard.mask
+        self.0 & blizzard.0 == blizzard.0
     }
 
     fn enqueue(&mut self, blizzard: Blizzard) {
-        self.0 |= blizzard.mask << 4
+        self.0 |= blizzard.0 << 4
     }
 
     fn update(&mut self) {
@@ -224,8 +253,7 @@ impl Valley {
                         continue;
                     }
 
-                    let x = add_coordinate(x, blizzard.dx, self.width);
-                    let y = add_coordinate(y, blizzard.dy, self.height);
+                    let (x, y) = self.find_next_position(x, y, blizzard);
                     self.tiles[x + y * self.width].enqueue(blizzard);
                 }
             }
@@ -246,8 +274,42 @@ impl Valley {
             y: self.height as u8 - 1,
         }
     }
-}
 
-fn add_coordinate(value: usize, delta: i8, max: usize) -> usize {
-    (value + max).wrapping_add_signed(delta as isize) % max
+    fn find_next_position(&self, x: usize, y: usize, blizzard: Blizzard) -> (usize, usize) {
+        match blizzard {
+            Blizzard::UP => {
+                if y == 0 {
+                    (x, self.height - 1)
+                } else {
+                    (x, y - 1)
+                }
+            }
+            Blizzard::RIGHT => {
+                let next_x = x + 1;
+
+                if next_x == self.width {
+                    (0, y)
+                } else {
+                    (next_x, y)
+                }
+            }
+            Blizzard::DOWN => {
+                let next_y = y + 1;
+
+                if next_y == self.height {
+                    (x, 0)
+                } else {
+                    (x, next_y)
+                }
+            }
+            Blizzard::LEFT => {
+                if x == 0 {
+                    (self.width - 1, y)
+                } else {
+                    (x - 1, y)
+                }
+            }
+            _ => unreachable!(),
+        }
+    }
 }
